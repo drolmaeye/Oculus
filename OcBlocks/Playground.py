@@ -9,15 +9,14 @@ import sys
 from PyQt4 import QtGui, QtCore, Qt
 import numpy as np
 import pyqtgraph as pg
-from epics import PV, caget
+from epics import PV, caget, caget_many
 from epics.devices import Scan
 import time
 import os
 
 
-
-
 class Window(QtGui.QMainWindow):
+    tapped = QtCore.pyqtSignal()
 
     def __init__(self):
         super(Window, self).__init__()
@@ -25,69 +24,103 @@ class Window(QtGui.QMainWindow):
         self.setWindowTitle('Oculus Mechanicus')
         self.setWindowIcon(QtGui.QIcon('eye1.png'))
 
-        # ###self.scan_trhead = ScanThread(self)
-        # ###self.scan_trhead.scan_thread_callback_signal.connect(self.draw_plot)
-
-        # self.test_9000()
-
-    def draw_plot(self):
-        print 'drawing'
-
-    def test_9000(self):
-        print 'testing . . .'
-
-
-def print_new_pv(**kwargs):
-    print kwargs['pvname']
-    print kwargs['value']
-    print caget(os.path.splitext(kwargs['value'])[0] + '.RTYP')
-
-# print caget('16TEST1:scan1.D01PV')
-# print caget(os.path.splitext(caget('16TEST1:scan1.D01PV'))[0] + '.RTYP')
-
-t0 = time.clock()
-srec1 = Scan('16TEST1:scan1')
-# print time.clock() - t0
-
-
-active_detectors = []
-for i in range(1, 71):
-    print srec1.get('D%2.2iNV' % i)
-    if not srec1.get('D%2.2iPV' % i) == '':
-        active_detectors.append('D%2.2iPV' % i)
-print active_detectors
-for each in active_detectors:
-    print srec1.get(each)
+        self.tapped.connect(find_name)
 
 
 
-for i in range(1, 71):
-    srec1.add_callback('D%2.2iPV' % i, print_new_pv)
+num_positioners = 1
+num_triggers = 1
+num_detectors = 10
+
+pos_attrs = ('PV', 'SP', 'EP', 'SI', 'CP', 'WD', 'PA', 'AR', 'SM', 'PP')
+
+pnpv = {}
+rncv = {}
+pnra = {}
+
+dnnpv = {}
+dnncv = {}
+dnnda = {}
+
+active_detectors = {}
+x_values = np.zeros(1001)
+
+trunk = '16TEST1:scan1.'
 
 
-t1 = time.clock()
-cv_list = []
-for i in range(1, 71):
-    print(srec1.get('D%2.2iCV' % i))
-print time.clock() - t1
-print cv_list
+# callbacks
+def val1_t(**kwargs):
+    start_val = time.clock()
+    current_index = cpt1.value
+    x_values[current_index - 1] = rncv['R1CV'].value
+    for detectors in active_detectors:
+        active_detectors[detectors][current_index - 1] = dnncv[detectors].value
+        # print active_detectors[detectors][:current_index]
+    print 'end of point:', time.clock() - start_val
+
+
+def data1_t(**kwargs):
+    print 'start/stop'
+    if data1.value == 0:
+        pp = pnpv['P1PP'].value
+        sp = pnpv['P1SP'].value
+        ep = pnpv['P1EP'].value
+        if pnpv['P1AR'].value == 0:
+            min = sp
+            max = ep
+        else:
+            min = pp + sp
+            max = pp + ep
+        print min, max
+        eye.tapped.emit()
+    else:
+        print x_values[:cpt1.value]
+        for detectors in active_detectors:
+            print active_detectors[detectors][:cpt1.value]
+
+
+def find_name():
+    ppv_trunk = os.path.splitext(pnpv['P1PV'].value)[0]
+    record = caget(ppv_trunk + '.RTYP')
+    print record
+    if record == 'motor':
+        name = caget(ppv_trunk + '.DESC')
+    print name
 
 
 
 
+# initialize all PVs
+# in testing, 4 positioners and 70 detectors nets 254 PVs connected in ~2.6 seconds
+for i in range(1, num_positioners + 1):
+    for a in pos_attrs:
+        key_pnpv = 'P%i%s' % (i, a)
+        pnpv[key_pnpv] = PV(trunk + key_pnpv)
+    key_rncv = 'R%iCV' % i
+    rncv[key_rncv] = PV(trunk + key_rncv)
+    key_pnra = 'P%iRA' % i
+    pnra[key_pnra] = PV(trunk + key_pnra)
 
+for i in range(1, num_detectors + 1):
+    key_p, key_c, key_r = 'D%2.2iPV' % i, 'D%2.2iCV' % i, 'D%2.2iDA' % i
+    dnnpv[key_p] = PV(trunk + key_p)
+    dnncv[key_c] = PV(trunk + key_c)
+    dnnda[key_r] = PV(trunk + key_r)
 
+val1 = PV('16TEST1:scan1.VAL', callback=val1_t)
+data1 = PV('16TEST1:scan1.DATA', callback=data1_t)
+cpt1 = PV('16TEST1:scan1.CPT')
 
+a = time.clock()
+for i in range(1, num_detectors + 1):
+    key = 'D%2.2iPV' % i
+    if dnnpv[key].value != '':
+        key_active_det = 'D%2.2iCV' % i
+        active_detectors[key_active_det] = np.zeros(1001)
+print time.clock() - a
 
-
-
-
-
-
-
-
-
-
+tapped = QtCore.pyqtSignal(int)
+#tapped.connect(find_name)
 
 app = QtGui.QApplication(sys.argv)
 eye = Window()
