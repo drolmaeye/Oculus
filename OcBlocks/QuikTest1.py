@@ -25,3 +25,10 @@ df = time.clock() - di
 
 print af, bf, cf, df
 
+alpha = 'fred'
+
+if alpha:
+    print 'yes'
+else:
+    print 'no'
+
