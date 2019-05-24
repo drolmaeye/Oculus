@@ -16,6 +16,7 @@ import os
 
 
 class Window(QtGui.QMainWindow):
+    update_plot_signal = QtCore.pyqtSignal()
 
     def __init__(self):
         super(Window, self).__init__()
@@ -47,11 +48,65 @@ class Window(QtGui.QMainWindow):
         # custom viewbox, vb, allows for custom button event handling
         # self.pw = pg.PlotWidget(viewBox=vb, name='Plot1')
 
+        color_list = [
+            (0, 0, 200),
+            (0, 128, 0),
+            (19, 234, 201),
+            (195, 46, 212),
+            (250, 194, 5),
+            (0, 114, 189),
+            (217, 83, 25),
+            (237, 177, 32),
+            (126, 47, 142),
+            (119, 172, 48)]
+
+        symbol_list = [
+            'o',
+            't1',
+            's',
+            'd',
+            'star',
+            't',
+            '+']
+
+        symbol_pen = 'w'
+        symbol_size = 0
+        width = 2
+
+        line_style_list = []
+        for i in symbol_list:
+            for j in color_list:
+                keywords = {'pen': {'color': j, 'width': width}, 'symbolBrush': j, 'symbolPen': j, 'symbol': i, 'symbolSize': symbol_size}
+                line_style_list.append(keywords)
+        print line_style_list
+
+        # ###for i in symbol_list:
+        # ###    for j in color_list:
+        # ###        keywords = {'pen': j}
+        # ###        line_style_list.append(keywords)
+        # ###print line_style_list
+
+
+
+
+        self.dnncv = {}
+        for i in range(1, scan1.NUM_DETECTORS + 1):
+            key_cv = 'D%2.2iCV' % i
+            self.dnncv[key_cv] = pg.PlotDataItem(name=key_cv, **line_style_list[i - 1])
+            self.pw.addItem(self.dnncv[key_cv])
+
         # ###LAYOUT MANAGEMENT### #
         # make layout for left side of main window and add plot window
         self.left_layout = QtGui.QVBoxLayout()
         self.mw_layout.addLayout(self.left_layout)
         self.left_layout.addWidget(self.pw)
+
+        self.update_plot_signal.connect(self.update_plot)
+
+    def update_plot(self):
+        current_plot_index = scan1.cpt.value
+        for detectors in scan1.active_detectors:
+            self.dnncv[detectors].setData(scan1.x_values[:current_plot_index], scan1.active_detectors[detectors][:current_plot_index])
 
 
 
@@ -120,6 +175,7 @@ class CoreData(QtCore.QObject):
         self.update_detectors_signal.connect(self.update_detectors)
 
 
+
     # PV callbacks
     def detectors_modified(self, **kwargs):
         print 'detector modified'
@@ -131,7 +187,9 @@ class CoreData(QtCore.QObject):
         self.x_values[current_index] = self.rncv['R1CV'].value
         for detectors in self.active_detectors:
             self.active_detectors[detectors][current_index] = self.dnncv[detectors].value
-            print self.active_detectors[detectors][:current_index + 1]
+            # print self.active_detectors[detectors][:current_index + 1]
+            # eye.dnncv[detectors].setData(self.x_values[:current_index + 1], self.active_detectors[detectors][:current_index + 1])
+        eye.update_plot_signal.emit()
 
     def data_triggered(self, **kwargs):
         print 'start/stop'
@@ -142,18 +200,21 @@ class CoreData(QtCore.QObject):
             sp = self.pnpv['P1SP'].value
             ep = self.pnpv['P1EP'].value
             if self.pnpv['P1AR'].value == 0:
-                min = sp
-                max = ep
+                x_min = sp
+                x_max = ep
             else:
-                min = pp + sp
-                max = pp + ep
+                x_min = pp + sp
+                x_max = pp + ep
             # TODO send these values out to GUI for initial draw
+            eye.pw.setXRange(x_min, x_max)
         else:
             # in reality, probably need to plot DddDA and PnRA arrays
             num_points = self.npts.value
-            print self.x_values[:num_points]
+            # print self.x_values[:num_points]
             for detectors in self.active_detectors:
-                print self.active_detectors[detectors][:num_points]
+                # print self.active_detectors[detectors][:num_points]
+                pass
+
 
     # slots
     def update_pos_name(self):
