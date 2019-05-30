@@ -1,34 +1,41 @@
-from epics import *
-import time
-import timeit
+import sys
+from PyQt4 import QtGui, QtCore, Qt
 
 
-pv = PV('16TEST1:scan1.D02NV')
+class Window(QtGui.QMainWindow):
+    def __init__(self):
+        super(Window, self).__init__()
+        self.setGeometry(150, 150, 500, 500)
+        self.setWindowTitle('Draw')
 
-ai = time.clock()
-a = pv.value
-af = time.clock() - ai
 
-bi = time.clock()
-b = caget('16TEST1:scan1.D01NV')
-bf = time.clock() - bi
-
-ci = time.clock()
-c = pv.value
-cf = time.clock() - ci
-
-di = time.clock()
-d = caget('16TEST1:scan1.D01NV')
-df = time.clock() - di
+    def paintEvent(self, event):
+        painter = QtGui.QPainter()
+        painter.begin(self)
+        painter.setPen(QtGui.QPen(QtCore.Qt.green, 8, QtCore.Qt.DashLine))
+        painter.drawEllipse(40, 40, 400, 400)
+        painter.end()
 
 
 
-print af, bf, cf, df
 
-alpha = 'fred'
 
-if alpha:
-    print 'yes'
-else:
-    print 'no'
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app = QtGui.QApplication(sys.argv)
+win = Window()
+win.show()
+sys.exit(app.exec_())
