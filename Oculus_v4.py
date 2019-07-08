@@ -87,6 +87,19 @@ class Window(QtGui.QMainWindow):
             self.dnncv[key_cv] = pg.PlotDataItem(name=key_cv, **line_style_list[i - 1])
             # self.pw.addItem(self.dnncv[key_cv])
 
+        self.vline_min = pg.InfiniteLine(angle=90, pen='b', movable=True)
+        self.vline_mid = pg.InfiniteLine(angle=90, pen={'color': 'r', 'style': QtCore.Qt.DashLine}, movable=False)
+        self.vline_max = pg.InfiniteLine(angle=90, pen='b', movable=True)
+
+        self.pw.addItem(self.vline_min)
+        self.pw.addItem(self.vline_mid)
+        self.pw.addItem(self.vline_max)
+
+        self.vline_min.sigPositionChanged.connect(self.vline_moved)
+        self.vline_max.sigPositionChanged.connect(self.vline_moved)
+
+
+
         # ###LAYOUT MANAGEMENT### #
         # make layout for left side of main window and add plot window
         self.left_layout = QtGui.QVBoxLayout()
@@ -134,6 +147,12 @@ class Window(QtGui.QMainWindow):
 
 
 
+    def vline_moved(self):
+        max = self.vline_max.getXPos()
+        min = self.vline_min.getXPos()
+        print min, max
+        mid = (min + max) / 2.0
+        self.vline_mid.setX(mid)
 
 
     def update_plot(self):
@@ -248,6 +267,11 @@ class CoreData(QtCore.QObject):
                 x_max = pp + ep
             # TODO send these values out to GUI for initial draw
             eye.pw.setXRange(x_min, x_max)
+            width = x_max - x_min
+            eye.vline_min.setX(x_min + width*0.25)
+            eye.vline_mid.setX(x_min + width*0.50)
+            eye.vline_max.setX(x_min + width*0.75)
+
         else:
             # in reality, probably need to plot DddDA and PnRA arrays
             num_points = self.npts.value
@@ -315,6 +339,7 @@ app = QtGui.QApplication(sys.argv)
 root, stump1 = '16TEST1:', 'scan1.'
 scan1 = CoreData(root, stump1)
 eye = Window()
+# pg.setConfigOptions(antialias=True)
 scan1.update_detectors()
 eye.show()
 sys.exit(app.exec_())
